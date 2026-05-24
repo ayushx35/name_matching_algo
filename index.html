@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Name Matcher Pro — CSV Batch Scoring</title>
+    <meta name="description"
+        content="Upload a CSV with Name1 and Name2 columns to get fuzzy name-matching scores instantly." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #0d1117;
+            --surface: #161b22;
+            --surface2: #1c2230;
+            --border: #30363d;
+            --accent: #58a6ff;
+            --accent2: #7c3aed;
+            --accent-grad: linear-gradient(135deg, #58a6ff, #7c3aed);
+            --text: #e6edf3;
+            --muted: #8b949e;
+            --success: #3fb950;
+            --warning: #d29922;
+            --danger: #f85149;
+            --radius: 12px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px 80px;
+        }
+
+        /* ── Header ── */
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .logo-icon {
+            width: 42px;
+            height: 42px;
+            background: var(--accent-grad);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: var(--accent-grad);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 0.95rem;
+            margin-top: 6px;
+        }
+
+        /* ── Main Card ── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: 680px;
+            padding: 32px;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        /* ── Drop Zone ── */
+        #dropzone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 48px 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            position: relative;
+        }
+
+        #dropzone:hover,
+        #dropzone.over {
+            border-color: var(--accent);
+            background: rgba(88, 166, 255, 0.05);
+        }
+
+        #dropzone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .drop-icon {
+            font-size: 40px;
+            margin-bottom: 12px;
+        }
+
+        .drop-label {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .drop-hint {
+            font-size: 0.85rem;
+            color: var(--muted);
+            margin-top: 6px;
+        }
+
+        .file-badge {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 14px;
+            font-size: 0.9rem;
+            color: var(--success);
+            font-weight: 500;
+        }
+
+        /* ── Info Box ── */
+        .info-box {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px 18px;
+            font-size: 0.85rem;
+            color: var(--muted);
+            margin-top: 20px;
+            line-height: 1.6;
+        }
+
+        .info-box strong {
+            color: var(--accent);
+        }
+
+        /* ── Action Button ── */
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            margin-top: 20px;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: var(--accent-grad);
+            color: #fff;
+            transition: opacity 0.2s, transform 0.15s;
+        }
+
+        .btn:hover:not(:disabled) {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* ── Progress ── */
+        #progress-wrap {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .progress-label {
+            font-size: 0.85rem;
+            color: var(--muted);
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .progress-bar-bg {
+            background: var(--surface2);
+            border-radius: 99px;
+            height: 8px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--accent-grad);
+            border-radius: 99px;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        /* ── Status ── */
+        #status {
+            margin-top: 16px;
+            font-size: 0.9rem;
+            min-height: 22px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        #status.success {
+            color: var(--success);
+        }
+
+        #status.error {
+            color: var(--danger);
+        }
+
+        #status.info {
+            color: var(--accent);
+        }
+
+        /* ── Preview Table ── */
+        #preview-wrap {
+            display: none;
+            margin-top: 28px;
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .preview-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .preview-count {
+            font-size: 0.8rem;
+            color: var(--muted);
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            padding: 3px 10px;
+            border-radius: 99px;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        thead tr {
+            background: var(--surface2);
+        }
+
+        th,
+        td {
+            padding: 10px 14px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            color: var(--muted);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.75rem;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr:hover {
+            background: rgba(88, 166, 255, 0.04);
+        }
+
+        .score-pill {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 99px;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+
+        .score-high {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--success);
+        }
+
+        .score-medium {
+            background: rgba(210, 153, 34, 0.15);
+            color: var(--warning);
+        }
+
+        .score-low {
+            background: rgba(248, 81, 73, 0.15);
+            color: var(--danger);
+        }
+
+        /* ── Download Again (shown after success) ── */
+        #dl-btn {
+            display: none;
+            margin-top: 12px;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--accent);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        }
+
+        #dl-btn:hover {
+            background: rgba(88, 166, 255, 0.08);
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="logo">
+            <div class="logo-icon">🔎</div>
+            <h1>Name Matcher Pro</h1>
+        </div>
+        <p class="subtitle">Batch fuzzy name-matching • Upload CSV → Get scored results instantly</p>
+    </header>
+
+    <div class="card">
+
+        <!-- Drop Zone -->
+        <div id="dropzone">
+            <input type="file" id="csvFile" accept=".csv" />
+            <div class="drop-icon">📂</div>
+            <div class="drop-label">Drop your CSV here or click to browse</div>
+            <div class="drop-hint">Required columns: <strong>Name1</strong> and <strong>Name2</strong></div>
+            <div class="file-badge" id="file-badge">✅ <span id="file-name"></span></div>
+        </div>
+
+        <!-- Info Box -->
+        <div class="info-box">
+            Your CSV must have exactly two columns: <strong>Name1</strong> (target) and <strong>Name2</strong>
+            (candidate).<br>
+            The matching engine handles <strong>case differences</strong>, <strong>spacing</strong>,
+            <strong>initials</strong>, and <strong>phonetic variations</strong>.
+        </div>
+
+        <!-- Action Button -->
+        <button class="btn" id="btn" onclick="processCSV()">
+            ⚡ Match & Download Results
+        </button>
+
+        <!-- Progress -->
+        <div id="progress-wrap">
+            <div class="progress-label">
+                <span id="progress-text">Processing…</span>
+                <span id="progress-pct">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progress-fill"></div>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div id="status"></div>
+
+        <!-- Download Again -->
+        <button id="dl-btn" onclick="downloadLast()">⬇ Download Results Again</button>
+
+        <!-- Preview Table -->
+        <div id="preview-wrap">
+            <div class="preview-header">
+                <span class="preview-title">Preview Results</span>
+                <span class="preview-count" id="preview-count"></span>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Name 1</th>
+                            <th>Name 2</th>
+                            <th>Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="preview-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let lastCsv = null;
+
+        // ── Drag & Drop highlight ──
+        const dz = document.getElementById('dropzone');
+        dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+        dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+        dz.addEventListener('drop', e => {
+            e.preventDefault();
+            dz.classList.remove('over');
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                document.getElementById('csvFile').files = e.dataTransfer.files;
+                showFileBadge(file.name);
+            }
+        });
+
+        document.getElementById('csvFile').addEventListener('change', e => {
+            if (e.target.files[0]) showFileBadge(e.target.files[0].name);
+        });
+
+        function showFileBadge(name) {
+            document.getElementById('file-name').textContent = name;
+            document.getElementById('file-badge').style.display = 'flex';
+        }
+
+        function setStatus(msg, type = 'info') {
+            const el = document.getElementById('status');
+            el.textContent = msg;
+            el.className = type;
+        }
+
+        function setProgress(pct, label) {
+            document.getElementById('progress-fill').style.width = pct + '%';
+            document.getElementById('progress-pct').textContent = pct + '%';
+            if (label) document.getElementById('progress-text').textContent = label;
+        }
+
+        async function processCSV() {
+            const fileInput = document.getElementById('csvFile');
+            const btn = document.getElementById('btn');
+
+            if (!fileInput.files[0]) { alert('Please select a CSV file first.'); return; }
+
+            btn.disabled = true;
+            document.getElementById('progress-wrap').style.display = 'block';
+            document.getElementById('preview-wrap').style.display = 'none';
+            document.getElementById('dl-btn').style.display = 'none';
+            document.getElementById('preview-body').innerHTML = '';
+            setStatus('Reading file…', 'info');
+            setProgress(10, 'Parsing CSV…');
+
+            Papa.parse(fileInput.files[0], {
+                header: true,
+                skipEmptyLines: true,
+                complete: async (results) => {
+                    const rows = results.data;
+                    if (!rows.length) {
+                        setStatus('CSV appears to be empty.', 'error');
+                        btn.disabled = false; return;
+                    }
+
+                    setProgress(30, `Sending ${rows.length} rows to server…`);
+                    setStatus(`Scoring ${rows.length} name pairs…`, 'info');
+
+                    try {
+                        const response = await fetch('http://localhost:3000/match-bulk', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ data: rows })
+                        });
+
+                        if (!response.ok) throw new Error(`Server error: ${response.status}`);
+
+                        setProgress(80, 'Generating CSV…');
+                        const matchedData = await response.json();
+
+                        if (!matchedData.length) {
+                            setStatus('No results returned.', 'error');
+                            btn.disabled = false; return;
+                        }
+
+                        const csv = Papa.unparse(matchedData);
+                        lastCsv = csv;
+                        downloadCSV(csv);
+
+                        setProgress(100, 'Done!');
+                        setStatus(`✅ ${matchedData.length} pairs scored! Download started.`, 'success');
+
+                        renderPreview(matchedData);
+                        document.getElementById('dl-btn').style.display = 'block';
+                    } catch (err) {
+                        setStatus('❌ Error: Make sure the Node server is running on port 3000.', 'error');
+                        console.error(err);
+                    } finally {
+                        btn.disabled = false;
+                    }
+                }
+            });
+        }
+
+        function renderPreview(data) {
+            const wrap = document.getElementById('preview-wrap');
+            const body = document.getElementById('preview-body');
+            const count = document.getElementById('preview-count');
+            const preview = data.slice(0, 50);
+            count.textContent = `${data.length} rows${data.length > 50 ? ' (showing first 50)' : ''}`;
+            body.innerHTML = preview.map((row, i) => {
+                const pct = parseFloat(row.Score);
+                const cls = pct >= 80 ? 'score-high' : pct >= 50 ? 'score-medium' : 'score-low';
+                return `<tr>
+        <td>${i + 1}</td>
+        <td>${esc(row.Name1)}</td>
+        <td>${esc(row.Name2)}</td>
+        <td><span class="score-pill ${cls}">${row.Score}</span></td>
+      </tr>`;
+            }).join('');
+            wrap.style.display = 'block';
+        }
+
+        function esc(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function downloadCSV(csvContent) {
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `matched_results_${Date.now()}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function downloadLast() {
+            if (lastCsv) downloadCSV(lastCsv);
+        }
+    </script>
+</body>
+
+</html>
